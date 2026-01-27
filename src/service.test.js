@@ -2,6 +2,7 @@ const request = require('supertest');
 const app = require('./service');
 
 const testUser = { name: 'pizza diner', email: 'reg@test.com', password: 'a' };
+// eslint-disable-next-line no-unused-vars
 let testUserAuthToken;
 
 beforeAll(async () => {
