@@ -3,7 +3,7 @@ const app = require('./service');
 const { Role, DB } = require('./database/database.js');
 
 const testUser = { name: 'pizza diner', email: 'reg@test.com', password: 'a' };
-// eslint-disable-next-line no-unused-vars
+
 let testUserAuthToken;
 // eslint-disable-next-line no-unused-vars
 let adminUser;
@@ -25,6 +25,7 @@ beforeAll(async () => {
   testUser.email = Math.random().toString(36).substring(2, 12) + '@test.com';
   const registerRes = await request(app).post('/api/auth').send(testUser);
   testUserAuthToken = registerRes.body.token;
+  testUser.id = registerRes.body.user.id;
 
   adminUser = await createAdminUser();
 });
@@ -94,6 +95,15 @@ test('getUser', async () => {
   expect(res.body.roles).toBeInstanceOf(Array);
   expect(res.body.roles).toEqual([{ role: 'diner' }]);
   expect(res.body.password).toBeUndefined();
+});
+
+test('updateUser without admin permissions', async () => {
+    const res = await request(app).put(`/api/user/${testUser.id}`).set('Authorization', `Bearer ${testUserAuthToken}`).send({ name: 'updated name', email: 'updated@test.com' });
+    expect(res.status).toBe(200);
+    expect(res.body.user).toMatchObject({ name: 'updated name', email: 'updated@test.com' });
+    expect(res.body.token).toMatch(/^[a-zA-Z0-9\-_]*\.[a-zA-Z0-9\-_]*\.[a-zA-Z0-9\-_]*$/);
+    testUserAuthToken = res.body.token;
+    expect(res.body.user.password).toBeUndefined();
 });
 
 
