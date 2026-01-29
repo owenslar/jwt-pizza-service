@@ -52,6 +52,20 @@ test('GET - API docs', async () => {
   expect(res.body.config).toBeDefined();
 });
 
+// Auth route tests
+
+test('register', async () => {
+  const newUser = { name: 'test user', email: randomName() + '@test.com', password: 'testpass' };
+  const registerRes = await request(app).post('/api/auth').send(newUser);
+
+  expect(registerRes.status).toBe(200);
+  expect(registerRes.body.token).toMatch(/^[a-zA-Z0-9\-_]*\.[a-zA-Z0-9\-_]*\.[a-zA-Z0-9\-_]*$/);
+  expect(registerRes.body.user).toMatchObject({ name: newUser.name, email: newUser.email });
+  expect(registerRes.body.user.roles).toBeInstanceOf(Array);
+  expect(registerRes.body.user.roles).toEqual([{ role: 'diner' }]);
+  expect(registerRes.body.user.password).toBeUndefined();
+});
+
 test('login', async () => {
   const loginRes = await request(app).put('/api/auth').send(testUser);
   expect(loginRes.status).toBe(200);
@@ -61,6 +75,7 @@ test('login', async () => {
   const { password, ...user } = { ...testUser, roles: [{ role: 'diner' }] };
   expect(loginRes.body.user).toMatchObject(user);
 });
+
 
 
 
