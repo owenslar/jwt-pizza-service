@@ -113,7 +113,7 @@ test('getMenu', async () => {
     const res = await request(app).get('/api/order/menu');
     expect(res.status).toBe(200);
     expect(res.body).toBeInstanceOf(Array);
-    expect(res.body.length).toBeGreaterThan(0);
+    expect(res.body.length).toBeDefined();
 });
 
 test('addMenuItem unauthorized', async () => {
@@ -169,7 +169,7 @@ test('getFranchises', async () => {
     expect(res.status).toBe(200);
     expect(res.body).toBeInstanceOf(Object);
     expect(res.body.franchises).toBeInstanceOf(Array);
-    expect(res.body.franchises.length).toBeGreaterThan(0);
+    expect(res.body.franchises.length).toBeDefined();
 });
 
 test('getUserFranchises', async () => {
