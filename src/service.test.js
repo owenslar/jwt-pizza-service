@@ -182,3 +182,14 @@ test('getUserFranchises unauthorized', async () => {
     const res = await request(app).get(`/api/franchise/${adminUser.id}`).set('Authorization', `Bearer faketoken`);
     expect(res.status).toBe(401);
 });
+
+test('createFranchise', async () => {
+    const res = await request(app)
+        .post('/api/franchise')
+        .set('Authorization', `Bearer ${adminUserAuthToken}`)
+        .send({ name: 'Test Franchise', admins: [{email: adminUser.email}] });
+    
+    expect(res.status).toBe(200);
+    expect(res.body.name).toBe('Test Franchise');
+    expect(res.body.id).toBeDefined();
+});
