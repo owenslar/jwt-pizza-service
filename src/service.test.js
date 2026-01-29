@@ -43,6 +43,15 @@ test('GET invalid route', async () => {
     expect(res.body.version).toBeUndefined();
 })
 
+test('GET - API docs', async () => {
+  const res = await request(app).get('/api/docs');
+  expect(res.status).toBe(200);
+  expect(res.body.version).toBeDefined();
+  expect(res.body.endpoints.length).toBeGreaterThan(0);
+  expect(res.body.endpoints).toBeInstanceOf(Array);
+  expect(res.body.config).toBeDefined();
+});
+
 test('login', async () => {
   const loginRes = await request(app).put('/api/auth').send(testUser);
   expect(loginRes.status).toBe(200);
@@ -52,4 +61,6 @@ test('login', async () => {
   const { password, ...user } = { ...testUser, roles: [{ role: 'diner' }] };
   expect(loginRes.body.user).toMatchObject(user);
 });
+
+
 
