@@ -162,4 +162,23 @@ test('createOrder', async () => {
     expect(orderRes.body.order.items[0]).toMatchObject({ menuId: menuItem.id, description: menuItem.description, price: menuItem.price });
 });
 
+// Franchise router tests
+test('getFranchises', async () => {
+    const res = await request(app).get('/api/franchise').set('Authorization', `Bearer ${testUserAuthToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body).toBeInstanceOf(Object);
+    expect(res.body.franchises).toBeInstanceOf(Array);
+    expect(res.body.franchises.length).toBeGreaterThan(0);
+});
 
+test('getUserFranchises', async () => {
+    const res = await request(app).get(`/api/franchise/${testUser.id}`).set('Authorization', `Bearer ${testUserAuthToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body).toBeInstanceOf(Array);
+    expect(res.body.length).toBe(0);
+});
+
+test('getUserFranchises unauthorized', async () => {
+    const res = await request(app).get(`/api/franchise/${adminUser.id}`).set('Authorization', `Bearer faketoken`);
+    expect(res.status).toBe(401);
+});
