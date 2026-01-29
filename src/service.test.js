@@ -36,6 +36,13 @@ test('GET - welcome page', async () => {
   expect(res.body.version).toBeDefined();
 });
 
+test('GET invalid route', async () => {
+    const res = await request(app).get('/invalidroute');
+    expect(res.status).toBe(404);
+    expect(res.body.message).toBe('unknown endpoint');
+    expect(res.body.version).toBeUndefined();
+})
+
 test('login', async () => {
   const loginRes = await request(app).put('/api/auth').send(testUser);
   expect(loginRes.status).toBe(200);
