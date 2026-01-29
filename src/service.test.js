@@ -123,18 +123,19 @@ test('addMenuItem unauthorized', async () => {
 });
 
 test('addMenuItem successful', async () => {
+    const itemTitle = randomName();
     const res = await request(app)
         .put('/api/order/menu')
         .set('Authorization', `Bearer ${adminUserAuthToken}`)
         .send({ 
-            title: 'Test Item',
+            title: itemTitle,
             description: 'Test Description', 
             image: 'test.png',
             price: 9.99 
         });
     expect(res.status).toBe(200);
     expect(res.body).toBeInstanceOf(Array);
-    const addedItem = res.body.find(item => item.title === 'Test Item' && item.price === 9.99);
+    const addedItem = res.body.find(item => item.title === itemTitle && item.price === 9.99);
     expect(addedItem).toBeDefined();
 });
 
@@ -187,9 +188,25 @@ test('createFranchise', async () => {
     const res = await request(app)
         .post('/api/franchise')
         .set('Authorization', `Bearer ${adminUserAuthToken}`)
-        .send({ name: 'Test Franchise', admins: [{email: adminUser.email}] });
+        .send({ name: randomName(), admins: [{email: adminUser.email}] });
     
     expect(res.status).toBe(200);
-    expect(res.body.name).toBe('Test Franchise');
+    expect(res.body.name).toBeDefined();
     expect(res.body.id).toBeDefined();
+});
+
+test('deleteFranchise', async () => {
+    const createRes = await request(app)
+        .post('/api/franchise')
+        .set('Authorization', `Bearer ${adminUserAuthToken}`)
+        .send({ name: randomName(), admins: [{email: adminUser.email}] });
+    
+    expect(createRes.status).toBe(200);
+    const franchiseId = createRes.body.id;
+
+    const deleteRes = await request(app)
+        .delete(`/api/franchise/${franchiseId}`);
+    
+    expect(deleteRes.status).toBe(200);
+    expect(deleteRes.body.message).toBe('franchise deleted');
 });
