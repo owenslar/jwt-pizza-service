@@ -1,6 +1,6 @@
 const request = require('supertest');
 const app = require('./service');
-const { Role, DB } = require('../database/database.js');
+const { Role, DB } = require('./database/database.js');
 
 const testUser = { name: 'pizza diner', email: 'reg@test.com', password: 'a' };
 // eslint-disable-next-line no-unused-vars
@@ -29,6 +29,13 @@ beforeAll(async () => {
   adminUser = await createAdminUser();
 });
 
+test('GET - welcome page', async () => {
+  const res = await request(app).get('/');
+  expect(res.status).toBe(200);
+  expect(res.body.message).toContain('welcome');
+  expect(res.body.version).toBeDefined();
+});
+
 test('login', async () => {
   const loginRes = await request(app).put('/api/auth').send(testUser);
   expect(loginRes.status).toBe(200);
@@ -38,3 +45,4 @@ test('login', async () => {
   const { password, ...user } = { ...testUser, roles: [{ role: 'diner' }] };
   expect(loginRes.body.user).toMatchObject(user);
 });
+
