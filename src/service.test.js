@@ -5,8 +5,8 @@ const { Role, DB } = require('./database/database.js');
 const testUser = { name: 'pizza diner', email: 'reg@test.com', password: 'a' };
 
 let testUserAuthToken;
-// eslint-disable-next-line no-unused-vars
 let adminUser;
+let adminUserAuthToken;
 
 function randomName() {
     return Math.random().toString(36).substring(2, 12);
@@ -28,6 +28,8 @@ beforeAll(async () => {
     testUser.id = registerRes.body.user.id;
 
     adminUser = await createAdminUser();
+    const adminLoginRes = await request(app).put('/api/auth').send(adminUser);
+    adminUserAuthToken = adminLoginRes.body.token;
 });
 
 test('GET - welcome page', async () => {
@@ -106,10 +108,34 @@ test('updateUser', async () => {
     expect(res.body.user.password).toBeUndefined();
 });
 
-test('deleteUser', async () => {
-
+// Order router tests
+test('getMenu', async () => {
+    const res = await request(app).get('/api/order/menu');
+    expect(res.status).toBe(200);
+    expect(res.body).toBeInstanceOf(Array);
+    expect(res.body.length).toBeGreaterThan(0);
 });
 
+test('addMenuItem unauthorized', async () => {
+    const res = await request(app).put('/api/order/menu').send({ description: 'Test Item', price: 9.99 });
+    expect(res.status).toBe(401);
+    expect(res.body.message).toContain('unauthorized');
+});
 
+test('addMenuItem successful', async () => {
+    const res = await request(app)
+        .put('/api/order/menu')
+        .set('Authorization', `Bearer ${adminUserAuthToken}`)
+        .send({ 
+            title: 'Test Item',
+            description: 'Test Description', 
+            image: 'test.png',
+            price: 9.99 
+        });
+    expect(res.status).toBe(200);
+    expect(res.body).toBeInstanceOf(Array);
+    const addedItem = res.body.find(item => item.title === 'Test Item' && item.price === 9.99);
+    expect(addedItem).toBeDefined();
+});
 
 
