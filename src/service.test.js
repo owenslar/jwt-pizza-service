@@ -138,4 +138,28 @@ test('addMenuItem successful', async () => {
     expect(addedItem).toBeDefined();
 });
 
+test('getOrders', async () => {
+    const res = await request(app).get('/api/order').set('Authorization', `Bearer ${testUserAuthToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body).toBeInstanceOf(Object);
+    expect(res.body.orders).toBeInstanceOf(Array);
+})
+
+test('createOrder', async () => {
+    const menuRes = await request(app).get('/api/order/menu');
+    const menuItem = menuRes.body[0];
+
+    const orderRes = await request(app)
+        .post('/api/order')
+        .set('Authorization', `Bearer ${testUserAuthToken}`)
+        .send({ franchiseId: 1, storeId: 1, items: [{ menuId: menuItem.id, description: menuItem.description, price: menuItem.price }] });
+    
+    expect(orderRes.status).toBe(200);
+    expect(orderRes.body.order).toBeDefined();
+    expect(orderRes.body.order.id).toBeDefined();
+    expect(orderRes.body.order.items).toBeInstanceOf(Array);
+    expect(orderRes.body.order.items.length).toBe(1);
+    expect(orderRes.body.order.items[0]).toMatchObject({ menuId: menuItem.id, description: menuItem.description, price: menuItem.price });
+});
+
 
