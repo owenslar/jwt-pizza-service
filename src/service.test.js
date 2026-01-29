@@ -260,3 +260,62 @@ test('deleteStore', async () => {
     expect(deleteRes.body.message).toBe('store deleted');
 });
 
+// Extra tests for more coverage
+test('register with missing fields', async () => {
+    const res = await request(app).post('/api/auth').send({ name: 'test' });
+    expect(res.status).toBe(400);
+});
+
+test('login with incorrect password', async () => {
+    const res = await request(app).put('/api/auth').send({ email: testUser.email, password: 'wrongpassword' });
+    expect(res.status).toBe(404);
+});
+
+test('updateUser as different user - forbidden', async () => {
+    const res = await request(app)
+        .put(`/api/user/999`)
+        .set('Authorization', `Bearer ${testUserAuthToken}`)
+        .send({ name: 'hacker', email: 'hacker@test.com', password: 'hacker' });
+    
+    expect(res.status).toBe(403);
+});
+
+test('addMenuItem as non-admin - forbidden', async () => {
+    const res = await request(app)
+        .put('/api/order/menu')
+        .set('Authorization', `Bearer ${testUserAuthToken}`)
+        .send({ 
+            title: randomName(),
+            description: 'Test', 
+            image: 'test.png',
+            price: 1.99 
+        });
+    
+    expect(res.status).toBe(403);
+});
+
+test('createFranchise as non-admin - forbidden', async () => {
+    const res = await request(app)
+        .post('/api/franchise')
+        .set('Authorization', `Bearer ${testUserAuthToken}`)
+        .send({ name: randomName(), admins: [{email: testUser.email}] });
+    
+    expect(res.status).toBe(403);
+});
+
+test('createStore without authorization - forbidden', async () => {
+    const res = await request(app)
+        .post(`/api/franchise/1/store`)
+        .set('Authorization', `Bearer ${testUserAuthToken}`)
+        .send({ name: randomName() });
+    
+    expect(res.status).toBe(403);
+});
+
+test('deleteStore without authorization - forbidden', async () => {
+    const res = await request(app)
+        .delete(`/api/franchise/1/store/1`)
+        .set('Authorization', `Bearer ${testUserAuthToken}`);
+    
+    expect(res.status).toBe(403);
+});
