@@ -86,6 +86,16 @@ test('logout', async () => {
   testUserAuthToken = loginRes.body.token;
 });
 
+// User router tests
+test('getUser', async () => {
+  const res = await request(app).get('/api/user/me').set('Authorization', `Bearer ${testUserAuthToken}`);
+  expect(res.status).toBe(200);
+  expect(res.body).toMatchObject({ name: testUser.name, email: testUser.email });
+  expect(res.body.roles).toBeInstanceOf(Array);
+  expect(res.body.roles).toEqual([{ role: 'diner' }]);
+  expect(res.body.password).toBeUndefined();
+});
+
 
 
 
