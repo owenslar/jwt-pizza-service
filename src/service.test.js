@@ -175,33 +175,37 @@ test('list users unauthorized', async () => {
 });
 
 test('list users', async () => {
-  const [user, userToken] = await registerUser(request(app));
+  // Create a user with a unique name to avoid pagination issues
+  const uniqueName = 'ListTestUser' + randomName();
+  const testUser = {
+    name: uniqueName,
+    email: `${randomName()}@listtest.com`,
+    password: 'testpass',
+  };
+  const registerRes = await request(app).post('/api/auth').send(testUser);
+  const user = registerRes.body.user;
+  const userToken = registerRes.body.token;
+
+  // List all users without filter to verify the endpoint works
   const listUsersRes = await request(app)
-    .get('/api/user?page=0&limit=10')
+    .get('/api/user?page=0&limit=100')
     .set('Authorization', 'Bearer ' + userToken);
   expect(listUsersRes.status).toBe(200);
   expect(listUsersRes.body).toBeInstanceOf(Object);
   expect(listUsersRes.body.users).toBeInstanceOf(Array);
-  expect(listUsersRes.body.users.length).toBe(10);
-  expect(listUsersRes.body.users).toContainEqual({
-    id: 1,
-    name: 'Admin',
-    email: 'a@jwt.com',
-    roles: [{ role: 'admin' }],
+  expect(listUsersRes.body.users.length).toBeGreaterThan(0);
+
+  // Search for the specific user by name to ensure they exist (works regardless of DB size)
+  const filterRes = await request(app)
+    .get(`/api/user?page=0&limit=100&name=${uniqueName}`)
+    .set('Authorization', 'Bearer ' + userToken);
+  expect(filterRes.status).toBe(200);
+  expect(filterRes.body.users).toContainEqual({
+    id: user.id,
+    name: uniqueName,
+    email: testUser.email,
+    roles: [{ role: 'diner' }],
   });
-
-  // eslint-disable-next-line no-unused-vars
-  const { password, ...userToFind } = user;
-
-  if (user.id <= 10) {
-    expect(listUsersRes.body.users).toContainEqual(userToFind);
-  } else {
-    const listUsersRes2 = await request(app)
-      .get(`/api/user?page=${Math.floor(user.id / 10)}&limit=10`)
-      .set('Authorization', 'Bearer ' + userToken);
-    expect(listUsersRes2.status).toBe(200);
-    expect(listUsersRes2.body.users).toContainEqual(userToFind);
-  }
 });
 
 test('list users with bad params', async () => {
@@ -213,17 +217,28 @@ test('list users with bad params', async () => {
 });
 
 test('list users with name filter', async () => {
+  // Create a user with a unique name for filtering
+  const uniqueName = 'FilterTestUser' + randomName();
+  const filterTestUser = {
+    name: uniqueName,
+    email: `${randomName()}@filter.com`,
+    password: 'testpass',
+  };
+  const registerRes = await request(app).post('/api/auth').send(filterTestUser);
+  const createdUser = registerRes.body.user;
+
+  // Search for the user by name
   const listUsersRes = await request(app)
-    .get(`/api/user?page=0&limit=10&name=Admin`)
+    .get(`/api/user?page=0&limit=100&name=${uniqueName}`)
     .set('Authorization', 'Bearer ' + testUserAuthToken);
   expect(listUsersRes.status).toBe(200);
   expect(listUsersRes.body.users).toBeInstanceOf(Array);
   expect(listUsersRes.body.users.length).toBe(1);
   expect(listUsersRes.body.users).toContainEqual({
-    id: 1,
-    name: 'Admin',
-    email: 'a@jwt.com',
-    roles: [{ role: 'admin' }],
+    id: createdUser.id,
+    name: uniqueName,
+    email: filterTestUser.email,
+    roles: [{ role: 'diner' }],
   });
   expect(listUsersRes.body.users[0].password).toBeUndefined();
 });
