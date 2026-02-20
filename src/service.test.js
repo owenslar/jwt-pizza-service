@@ -146,6 +146,11 @@ test('updateUser', async () => {
   expect(res.body.user.password).toBeUndefined();
 });
 
+test('delete users unauthorized', async () => {
+  const res = await request(app).delete('/api/user/1');
+  expect(res.status).toBe(401);
+});
+
 test('list users unauthorized', async () => {
   const listUsersRes = await request(app).get('/api/user');
   expect(listUsersRes.status).toBe(401);
