@@ -131,6 +131,17 @@ class DB {
     }
   }
 
+  async deleteUser(userId) {
+    const connection = await this.getConnection();
+
+    try {
+      await this.query(connection, `DELETE FROM user WHERE id=?`, [userId]);
+      return 'successfully deleted user';
+    } finally {
+      connection.end();
+    }
+  }
+
   async getUsers(page = 0, limit = 10, nameFilter = '*') {
     const connection = await this.getConnection();
     const offset = page * limit;

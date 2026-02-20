@@ -151,13 +151,22 @@ test('delete users unauthorized', async () => {
   expect(res.status).toBe(401);
 });
 
-test('delete user', async () => {
+test('delete user as admin', async () => {
+  const newUser = await registerUser(request(app));
+  const res = await request(app)
+    .delete(`/api/user/${newUser.id}`)
+    .set('Authorization', `Bearer ${adminUserAuthToken}`);
+  expect(res.status).toBe(200);
+  expect(res.body.message).toBe('successfully deleted user');
+});
+
+test('delete user not as admin', async () => {
   const newUser = await registerUser(request(app));
   const res = await request(app)
     .delete(`/api/user/${newUser.id}`)
     .set('Authorization', `Bearer ${testUserAuthToken}`);
-  expect(res.status).toBe(200);
-  expect(res.body.message).toBe('successfully deleted user');
+  expect(res.status).toBe(403);
+  expect(res.body.message).toBe('unauthorized');
 });
 
 test('list users unauthorized', async () => {
