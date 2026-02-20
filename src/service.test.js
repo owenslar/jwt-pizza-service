@@ -21,6 +21,18 @@ async function createAdminUser() {
   return { ...user, password: 'toomanysecrets' };
 }
 
+async function registerUser(service) {
+  const testUser = {
+    name: 'pizza diner',
+    email: `${randomName()}@test.com`,
+    password: 'a',
+  };
+  const registerRes = await service.post('/api/auth').send(testUser);
+  registerRes.body.user.password = testUser.password;
+
+  return [registerRes.body.user, registerRes.body.token];
+}
+
 beforeAll(async () => {
   testUser.email = Math.random().toString(36).substring(2, 12) + '@test.com';
   const registerRes = await request(app).post('/api/auth').send(testUser);
@@ -132,6 +144,41 @@ test('updateUser', async () => {
   );
   testUserAuthToken = res.body.token;
   expect(res.body.user.password).toBeUndefined();
+});
+
+test('list users unauthorized', async () => {
+  const listUsersRes = await request(app).get('/api/user');
+  expect(listUsersRes.status).toBe(401);
+});
+
+test('list users', async () => {
+  const [user, userToken] = await registerUser(request(app));
+  const listUsersRes = await request(app)
+    .get('/api/user?page=0&limit=10')
+    .set('Authorization', 'Bearer ' + userToken);
+  expect(listUsersRes.status).toBe(200);
+  expect(listUsersRes.body).toBeInstanceOf(Object);
+  expect(listUsersRes.body.users).toBeInstanceOf(Array);
+  expect(listUsersRes.body.users.length).toBe(10);
+  expect(listUsersRes.body.users).toContainEqual({
+    id: 1,
+    name: 'Admin',
+    email: 'a@jwt.com',
+    roles: [{ role: 'admin' }],
+  });
+
+  // eslint-disable-next-line no-unused-vars
+  const { password, ...userToFind } = user;
+
+  if (user.id <= 10) {
+    expect(listUsersRes.body.users).toContainEqual(userToFind);
+  } else {
+    const listUsersRes2 = await request(app)
+      .get(`/api/user?page=${Math.floor(user.id / 10)}&limit=10`)
+      .set('Authorization', 'Bearer ' + userToken);
+    expect(listUsersRes2.status).toBe(200);
+    expect(listUsersRes2.body.users).toContainEqual(userToFind);
+  }
 });
 
 // Order router tests
