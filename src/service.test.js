@@ -151,6 +151,15 @@ test('delete users unauthorized', async () => {
   expect(res.status).toBe(401);
 });
 
+test('delete user', async () => {
+  const newUser = await registerUser(request(app));
+  const res = await request(app)
+    .delete(`/api/user/${newUser.id}`)
+    .set('Authorization', `Bearer ${testUserAuthToken}`);
+  expect(res.status).toBe(200);
+  expect(res.body.message).toBe('successfully deleted user');
+});
+
 test('list users unauthorized', async () => {
   const listUsersRes = await request(app).get('/api/user');
   expect(listUsersRes.status).toBe(401);
