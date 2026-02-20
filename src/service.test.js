@@ -181,6 +181,40 @@ test('list users', async () => {
   }
 });
 
+test('list users with bad params', async () => {
+  const listUsersRes = await request(app)
+    .get('/api/user?page=1000&limit=10')
+    .set('Authorization', 'Bearer ' + testUserAuthToken);
+  expect(listUsersRes.body.users).toEqual([]);
+  expect(listUsersRes.body.more).toBe(false);
+});
+
+test('list users with name filter', async () => {
+  const listUsersRes = await request(app)
+    .get(`/api/user?page=0&limit=10&name=Admin`)
+    .set('Authorization', 'Bearer ' + testUserAuthToken);
+  expect(listUsersRes.status).toBe(200);
+  expect(listUsersRes.body.users).toBeInstanceOf(Array);
+  expect(listUsersRes.body.users.length).toBe(1);
+  expect(listUsersRes.body.users).toContainEqual({
+    id: 1,
+    name: 'Admin',
+    email: 'a@jwt.com',
+    roles: [{ role: 'admin' }],
+  });
+  expect(listUsersRes.body.users[0].password).toBeUndefined();
+});
+
+test('list users with broad filter', async () => {
+  const listUsersRes = await request(app)
+    .get(`/api/user?page=0&limit=10&name=*e*`)
+    .set('Authorization', 'Bearer ' + testUserAuthToken);
+  expect(listUsersRes.status).toBe(200);
+  expect(listUsersRes.body.users).toBeInstanceOf(Array);
+  expect(listUsersRes.body.users.length).toBeGreaterThan(0);
+  expect(listUsersRes.body.users[0].password).toBeUndefined();
+});
+
 // Order router tests
 test('getMenu', async () => {
   const res = await request(app).get('/api/order/menu');
