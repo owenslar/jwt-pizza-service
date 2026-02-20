@@ -7,6 +7,7 @@ const testUser = { name: 'pizza diner', email: 'reg@test.com', password: 'a' };
 let testUserAuthToken;
 let adminUser;
 let adminUserAuthToken;
+const usersToCleanup = [];
 
 function randomName() {
   return Math.random().toString(36).substring(2, 12);
@@ -38,10 +39,25 @@ beforeAll(async () => {
   const registerRes = await request(app).post('/api/auth').send(testUser);
   testUserAuthToken = registerRes.body.token;
   testUser.id = registerRes.body.user.id;
+  usersToCleanup.push(testUser.id);
 
   adminUser = await createAdminUser();
   const adminLoginRes = await request(app).put('/api/auth').send(adminUser);
   adminUserAuthToken = adminLoginRes.body.token;
+  usersToCleanup.push(adminUser.id);
+});
+
+afterAll(async () => {
+  // Clean up all users created during tests
+  for (const userId of usersToCleanup) {
+    try {
+      await request(app)
+        .delete(`/api/user/${userId}`)
+        .set('Authorization', `Bearer ${adminUserAuthToken}`);
+    } catch (error) {
+      console.log(`Failed to delete user with ID ${userId}:`, error);
+    }
+  }
 });
 
 test('GET - welcome page', async () => {
@@ -76,6 +92,7 @@ test('register', async () => {
     password: 'testpass',
   };
   const registerRes = await request(app).post('/api/auth').send(newUser);
+  usersToCleanup.push(registerRes.body.user.id);
 
   expect(registerRes.status).toBe(200);
   expect(registerRes.body.token).toMatch(
@@ -162,6 +179,7 @@ test('delete user as admin', async () => {
 
 test('delete user not as admin', async () => {
   const newUser = await registerUser(request(app));
+  usersToCleanup.push(newUser[0].id);
   const res = await request(app)
     .delete(`/api/user/${newUser.id}`)
     .set('Authorization', `Bearer ${testUserAuthToken}`);
@@ -185,6 +203,7 @@ test('list users', async () => {
   const registerRes = await request(app).post('/api/auth').send(testUser);
   const user = registerRes.body.user;
   const userToken = registerRes.body.token;
+  usersToCleanup.push(user.id);
 
   // List all users without filter to verify the endpoint works
   const listUsersRes = await request(app)
@@ -226,6 +245,7 @@ test('list users with name filter', async () => {
   };
   const registerRes = await request(app).post('/api/auth').send(filterTestUser);
   const createdUser = registerRes.body.user;
+  usersToCleanup.push(createdUser.id);
 
   // Search for the user by name
   const listUsersRes = await request(app)
