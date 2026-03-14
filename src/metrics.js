@@ -5,12 +5,48 @@ let metricsTimer = null;
 
 // Metrics stored in memory
 const httpMetrics = {};
+const activeUsers = new Map();
+
+const ACTIVE_THRESHOLD = 15 * 60 * 1000; // 15 minutes
 
 // Middleware to track requests
 function requestTracker(req, res, next) {
+  captureHTTPMetrics(req);
+  next();
+}
+
+function captureHTTPMetrics(req) {
   const method = `${req.method}`;
   httpMetrics[method] = (httpMetrics[method] || 0) + 1;
-  next();
+}
+
+function markUserActive(userId, token, now = Date.now()) {
+  activeUsers.set(token, { userId, lastActive: now });
+}
+
+function refreshUserActivity(userId, token, now = Date.now()) {
+  markUserActive(userId, token, now);
+}
+
+function markUserInactiveByToken(token) {
+  activeUsers.delete(token);
+}
+
+function sweepInactiveUsers(now = Date.now()) {
+  for (const [token, session] of activeUsers.entries()) {
+    if (now - session.lastActive > ACTIVE_THRESHOLD) {
+      activeUsers.delete(token);
+    }
+  }
+}
+
+function getActiveUserCount(now = Date.now()) {
+  sweepInactiveUsers(now);
+  const uniqueUsers = new Set();
+  for (const session of activeUsers.values()) {
+    uniqueUsers.add(session.userId);
+  }
+  return uniqueUsers.size;
 }
 
 // function getCpuUsagePercentage() {
@@ -39,6 +75,17 @@ function sendMetricsPeriodically(period = 10000) {
           }),
         );
       });
+
+      metrics.push(
+        createMetric(
+          'activeUsers',
+          getActiveUserCount(),
+          '1',
+          'gauge',
+          'asInt',
+          {},
+        ),
+      );
 
       //   metrics.push(
       //     createMetric(
@@ -131,4 +178,10 @@ function sendMetricToGrafana(metrics) {
     });
 }
 
-module.exports = { requestTracker, sendMetricsPeriodically };
+module.exports = {
+  requestTracker,
+  sendMetricsPeriodically,
+  refreshUserActivity,
+  markUserActive,
+  markUserInactiveByToken,
+};
