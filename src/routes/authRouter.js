@@ -7,6 +7,8 @@ const {
   markUserActive,
   refreshUserActivity,
   markUserInactiveByToken,
+  incrementAuthLoginFailure,
+  incrementAuthLoginSuccess,
 } = require('../metrics.js');
 
 const authRouter = express.Router();
@@ -103,10 +105,17 @@ authRouter.post(
 authRouter.put(
   '/',
   asyncHandler(async (req, res) => {
-    const { email, password } = req.body;
-    const user = await DB.getUser(email, password);
-    const auth = await setAuth(user);
-    res.json({ user: user, token: auth });
+    try {
+      const { email, password } = req.body;
+      const user = await DB.getUser(email, password);
+      const auth = await setAuth(user);
+
+      incrementAuthLoginSuccess();
+      res.json({ user: user, token: auth });
+    } catch (err) {
+      incrementAuthLoginFailure();
+      throw err;
+    }
   }),
 );
 

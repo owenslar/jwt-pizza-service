@@ -6,6 +6,10 @@ let metricsTimer = null;
 // Metrics stored in memory
 const httpMetrics = {};
 const activeUsers = new Map();
+const authMetrics = {
+  auth_login_success_total: 0,
+  auth_login_failure_total: 0,
+};
 
 const ACTIVE_THRESHOLD = 15 * 60 * 1000; // 15 minutes
 
@@ -20,6 +24,7 @@ function captureHTTPMetrics(req) {
   httpMetrics[method] = (httpMetrics[method] || 0) + 1;
 }
 
+// Metrics for tracking active users
 function markUserActive(userId, token, now = Date.now()) {
   activeUsers.set(token, { userId, lastActive: now });
 }
@@ -47,6 +52,15 @@ function getActiveUserCount(now = Date.now()) {
     uniqueUsers.add(session.userId);
   }
   return uniqueUsers.size;
+}
+
+// Metrics for success and failure auth attempts
+function incrementAuthLoginSuccess() {
+  authMetrics.auth_login_success_total += 1;
+}
+
+function incrementAuthLoginFailure() {
+  authMetrics.auth_login_failure_total += 1;
 }
 
 // function getCpuUsagePercentage() {
@@ -82,6 +96,28 @@ function sendMetricsPeriodically(period = 10000) {
           getActiveUserCount(),
           '1',
           'gauge',
+          'asInt',
+          {},
+        ),
+      );
+
+      metrics.push(
+        createMetric(
+          'auth_login_success_total',
+          authMetrics.auth_login_success_total,
+          '1',
+          'sum',
+          'asInt',
+          {},
+        ),
+      );
+
+      metrics.push(
+        createMetric(
+          'auth_login_failure_total',
+          authMetrics.auth_login_failure_total,
+          '1',
+          'sum',
           'asInt',
           {},
         ),
@@ -184,4 +220,6 @@ module.exports = {
   refreshUserActivity,
   markUserActive,
   markUserInactiveByToken,
+  incrementAuthLoginSuccess,
+  incrementAuthLoginFailure,
 };
