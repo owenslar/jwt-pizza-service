@@ -1,5 +1,5 @@
 const config = require('./config');
-// const os = require('os');
+const os = require('os');
 
 let metricsTimer = null;
 
@@ -63,18 +63,19 @@ function incrementAuthLoginFailure() {
   authMetrics.auth_login_failure_total += 1;
 }
 
-// function getCpuUsagePercentage() {
-//   const cpuUsage = os.loadavg()[0] / os.cpus().length;
-//   return cpuUsage.toFixed(2) * 100;
-// }
+// Helpers for system metrics
+function getCpuUsagePercentage() {
+  const cpuUsage = os.loadavg()[0] / os.cpus().length;
+  return cpuUsage.toFixed(2) * 100;
+}
 
-// function getMemoryUsagePercentage() {
-//   const totalMemory = os.totalmem();
-//   const freeMemory = os.freemem();
-//   const usedMemory = totalMemory - freeMemory;
-//   const memoryUsage = (usedMemory / totalMemory) * 100;
-//   return memoryUsage.toFixed(2);
-// }
+function getMemoryUsagePercentage() {
+  const totalMemory = os.totalmem();
+  const freeMemory = os.freemem();
+  const usedMemory = totalMemory - freeMemory;
+  const memoryUsage = (usedMemory / totalMemory) * 100;
+  return memoryUsage.toFixed(2);
+}
 
 function sendMetricsPeriodically(period = 10000) {
   if (metricsTimer) return metricsTimer;
@@ -123,16 +124,27 @@ function sendMetricsPeriodically(period = 10000) {
         ),
       );
 
-      //   metrics.push(
-      //     createMetric(
-      //       'greetingChange',
-      //       greetingChangedCount,
-      //       '1',
-      //       'sum',
-      //       'asInt',
-      //       {},
-      //     ),
-      //   );
+      metrics.push(
+        createMetric(
+          'cpu_usage_percentage',
+          getCpuUsagePercentage(),
+          'percent',
+          'gauge',
+          'asDouble',
+          {},
+        ),
+      );
+
+      metrics.push(
+        createMetric(
+          'memory_usage_percentage',
+          getMemoryUsagePercentage(),
+          'percent',
+          'gauge',
+          'asDouble',
+          {},
+        ),
+      );
 
       sendMetricToGrafana(metrics);
     } catch (error) {
