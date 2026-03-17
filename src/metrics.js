@@ -10,6 +10,8 @@ const authMetrics = {
   auth_login_success_total: 0,
   auth_login_failure_total: 0,
 };
+const pizzaMetrics = {};
+// const latencyMetrics = {};
 
 const ACTIVE_THRESHOLD = 15 * 60 * 1000; // 15 minutes
 
@@ -77,6 +79,14 @@ function getMemoryUsagePercentage() {
   return memoryUsage.toFixed(2);
 }
 
+// Pizza metrics
+function pizzaPurchase(success, latency, price) {
+  pizzaMetrics[success ? 'success' : 'failure'] =
+    (pizzaMetrics[success ? 'success' : 'failure'] || 0) + 1;
+  pizzaMetrics.totalRevenue =
+    (pizzaMetrics.totalRevenue || 0) + (success ? price : 0);
+}
+
 function sendMetricsPeriodically(period = 10000) {
   if (metricsTimer) return metricsTimer;
 
@@ -141,6 +151,39 @@ function sendMetricsPeriodically(period = 10000) {
           getMemoryUsagePercentage(),
           'percent',
           'gauge',
+          'asDouble',
+          {},
+        ),
+      );
+
+      metrics.push(
+        createMetric(
+          'pizza_purchase_success_total',
+          pizzaMetrics.success || 0,
+          '1',
+          'sum',
+          'asInt',
+          {},
+        ),
+      );
+
+      metrics.push(
+        createMetric(
+          'pizza_purchase_failure_total',
+          pizzaMetrics.failure || 0,
+          '1',
+          'sum',
+          'asInt',
+          {},
+        ),
+      );
+
+      metrics.push(
+        createMetric(
+          'pizza_total_revenue',
+          pizzaMetrics.totalRevenue || 0,
+          'BTC',
+          'sum',
           'asDouble',
           {},
         ),
@@ -234,4 +277,5 @@ module.exports = {
   markUserInactiveByToken,
   incrementAuthLoginSuccess,
   incrementAuthLoginFailure,
+  pizzaPurchase,
 };
