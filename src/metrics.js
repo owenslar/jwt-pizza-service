@@ -11,13 +11,33 @@ const authMetrics = {
   auth_login_failure_total: 0,
 };
 const pizzaMetrics = {};
-let latencyMetrics = [];
+let pizzaLatencyMetrics = [];
+let httpLatencyMetrics = [];
 
 const ACTIVE_THRESHOLD = 15 * 60 * 1000; // 15 minutes
 
 // Middleware to track requests
 function requestTracker(req, res, next) {
   captureHTTPMetrics(req);
+  next();
+}
+
+function requestLatencyTracker(req, res, next) {
+  const start = Date.now();
+  let recorded = false;
+
+  function record() {
+    if (recorded) return;
+    recorded = true;
+
+    const durationMs = Date.now() - start;
+
+    httpLatencyMetrics.push(durationMs);
+  }
+
+  res.on('finish', () => record());
+  res.on('close', () => record());
+  res.on('error', () => record());
   next();
 }
 
@@ -87,7 +107,7 @@ function pizzaPurchase(success, latency, price) {
     (pizzaMetrics.totalRevenue || 0) + (success ? price : 0);
 
   if (typeof latency === 'number' && Number.isFinite(latency) && latency >= 0) {
-    latencyMetrics.push(latency);
+    pizzaLatencyMetrics.push(latency);
   }
 }
 
@@ -193,15 +213,34 @@ function sendMetricsPeriodically(period = 1000) {
         ),
       );
 
-      const latencyAverage =
-        latencyMetrics.reduce((a, b) => a + b, 0) / latencyMetrics.length || 0;
-      latencyMetrics = [];
+      const httpLatencyAverage =
+        httpLatencyMetrics.reduce((a, b) => a + b, 0) /
+          httpLatencyMetrics.length || 0;
+      httpLatencyMetrics = [];
 
-      if (latencyAverage > 0) {
+      if (httpLatencyAverage > 0) {
+        metrics.push(
+          createMetric(
+            'http_latency_count_total',
+            httpLatencyAverage,
+            'ms',
+            'gauge',
+            'asDouble',
+            {},
+          ),
+        );
+      }
+
+      const pizzaLatencyAverage =
+        pizzaLatencyMetrics.reduce((a, b) => a + b, 0) /
+          pizzaLatencyMetrics.length || 0;
+      pizzaLatencyMetrics = [];
+
+      if (pizzaLatencyAverage > 0) {
         metrics.push(
           createMetric(
             'pizza_latency_count_total',
-            latencyAverage,
+            pizzaLatencyAverage,
             'ms',
             'gauge',
             'asDouble',
@@ -292,6 +331,7 @@ function sendMetricToGrafana(metrics) {
 
 module.exports = {
   requestTracker,
+  requestLatencyTracker,
   sendMetricsPeriodically,
   refreshUserActivity,
   markUserActive,
