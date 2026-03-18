@@ -11,7 +11,7 @@ const authMetrics = {
   auth_login_failure_total: 0,
 };
 const pizzaMetrics = {};
-// const latencyMetrics = {};
+let latencyMetrics = [];
 
 const ACTIVE_THRESHOLD = 15 * 60 * 1000; // 15 minutes
 
@@ -85,9 +85,13 @@ function pizzaPurchase(success, latency, price) {
     (pizzaMetrics[success ? 'success' : 'failure'] || 0) + 1;
   pizzaMetrics.totalRevenue =
     (pizzaMetrics.totalRevenue || 0) + (success ? price : 0);
+
+  if (typeof latency === 'number' && Number.isFinite(latency) && latency >= 0) {
+    latencyMetrics.push(latency);
+  }
 }
 
-function sendMetricsPeriodically(period = 10000) {
+function sendMetricsPeriodically(period = 1000) {
   if (metricsTimer) return metricsTimer;
 
   metricsTimer = setInterval(() => {
@@ -188,6 +192,23 @@ function sendMetricsPeriodically(period = 10000) {
           {},
         ),
       );
+
+      const latencyAverage =
+        latencyMetrics.reduce((a, b) => a + b, 0) / latencyMetrics.length || 0;
+      latencyMetrics = [];
+
+      if (latencyAverage > 0) {
+        metrics.push(
+          createMetric(
+            'pizza_latency_count_total',
+            latencyAverage,
+            'ms',
+            'gauge',
+            'asDouble',
+            {},
+          ),
+        );
+      }
 
       sendMetricToGrafana(metrics);
     } catch (error) {
