@@ -63,9 +63,9 @@ jobs:
             },
             logging: {
               source: 'jwt-pizza-service',
-              endpointUrl: '${{ secrets.LOGGING_ENDPOINT_URL }}',
+              url: '${{ secrets.LOGGING_ENDPOINT_URL }}',
               apiKey: '${{ secrets.LOGGING_API_KEY }}',
-              accountId: '${{ secrets.LOGGING_ACCOUNT_ID }}',
+              userId: '${{ secrets.LOGGING_ACCOUNT_ID }}',
             },            
           };" > src/config.js
 
