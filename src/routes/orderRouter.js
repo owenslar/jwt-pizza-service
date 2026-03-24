@@ -4,6 +4,7 @@ const { Role, DB } = require('../database/database.js');
 const { authRouter } = require('./authRouter.js');
 const { asyncHandler, StatusCodeError } = require('../endpointHelper.js');
 const metrics = require('../metrics.js');
+const logger = require('../logger.js');
 
 const orderRouter = express.Router();
 
@@ -117,6 +118,11 @@ orderRouter.post(
     const orderReq = req.body;
     const price = orderReq.items.reduce((total, item) => total + item.price, 0);
     const order = await DB.addDinerOrder(req.user, orderReq);
+    const orderInfo = {
+      diner: { id: req.user.id, name: req.user.name, email: req.user.email },
+      order: order,
+    };
+    logger.factoryLogger(orderInfo);
     const latencyStart = Date.now();
     const r = await fetch(`${config.factory.url}/api/order`, {
       method: 'POST',
@@ -131,6 +137,11 @@ orderRouter.post(
     });
     const j = await r.json();
     const latency = Date.now() - latencyStart;
+    const orderResponseInfo = {
+      diner: { id: req.user.id, name: req.user.name, email: req.user.email },
+      factoryResponse: j,
+    };
+    logger.factoryLogger(orderResponseInfo);
     if (r.ok) {
       res.send({ order, followLinkToEndChaos: j.reportUrl, jwt: j.jwt });
       metrics.pizzaPurchase(true, latency, price);
