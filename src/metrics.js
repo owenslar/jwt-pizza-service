@@ -13,6 +13,10 @@ const authMetrics = {
 const pizzaMetrics = {};
 let pizzaLatencyMetrics = [];
 let httpLatencyMetrics = [];
+let httpLatencySumTotal = 0;
+let httpLatencyCountTotal = 0;
+let pizzaLatencySumTotal = 0;
+let pizzaLatencyCountTotal = 0;
 
 const ACTIVE_THRESHOLD = 15 * 60 * 1000; // 15 minutes
 
@@ -213,15 +217,19 @@ function sendMetricsPeriodically(period = 1000) {
         ),
       );
 
+      const httpLatencyCount = httpLatencyMetrics.length;
+      const httpLatencySum = httpLatencyMetrics.reduce((a, b) => a + b, 0);
       const httpLatencyAverage =
-        httpLatencyMetrics.reduce((a, b) => a + b, 0) /
-          httpLatencyMetrics.length || 0;
+        httpLatencyCount > 0 ? httpLatencySum / httpLatencyCount : 0;
       httpLatencyMetrics = [];
 
-      if (httpLatencyAverage > 0) {
+      if (httpLatencyCount > 0) {
+        httpLatencySumTotal += httpLatencySum;
+        httpLatencyCountTotal += httpLatencyCount;
+
         metrics.push(
           createMetric(
-            'http_latency_count_total',
+            'http_latency_avg',
             httpLatencyAverage,
             'ms',
             'gauge',
@@ -229,21 +237,69 @@ function sendMetricsPeriodically(period = 1000) {
             {},
           ),
         );
-      }
 
-      const pizzaLatencyAverage =
-        pizzaLatencyMetrics.reduce((a, b) => a + b, 0) /
-          pizzaLatencyMetrics.length || 0;
-      pizzaLatencyMetrics = [];
-
-      if (pizzaLatencyAverage > 0) {
         metrics.push(
           createMetric(
-            'pizza_latency_count_total',
+            'http_latency_sum',
+            httpLatencySumTotal,
+            'ms',
+            'sum',
+            'asDouble',
+            {},
+          ),
+        );
+
+        metrics.push(
+          createMetric(
+            'http_latency_count',
+            httpLatencyCountTotal,
+            '1',
+            'sum',
+            'asInt',
+            {},
+          ),
+        );
+      }
+
+      const pizzaLatencyCount = pizzaLatencyMetrics.length;
+      const pizzaLatencySum = pizzaLatencyMetrics.reduce((a, b) => a + b, 0);
+      const pizzaLatencyAverage =
+        pizzaLatencyCount > 0 ? pizzaLatencySum / pizzaLatencyCount : 0;
+      pizzaLatencyMetrics = [];
+
+      if (pizzaLatencyCount > 0) {
+        pizzaLatencySumTotal += pizzaLatencySum;
+        pizzaLatencyCountTotal += pizzaLatencyCount;
+
+        metrics.push(
+          createMetric(
+            'pizza_latency_avg',
             pizzaLatencyAverage,
             'ms',
             'gauge',
             'asDouble',
+            {},
+          ),
+        );
+
+        metrics.push(
+          createMetric(
+            'pizza_latency_sum',
+            pizzaLatencySumTotal,
+            'ms',
+            'sum',
+            'asDouble',
+            {},
+          ),
+        );
+
+        metrics.push(
+          createMetric(
+            'pizza_latency_count',
+            pizzaLatencyCountTotal,
+            '1',
+            'sum',
+            'asInt',
             {},
           ),
         );
