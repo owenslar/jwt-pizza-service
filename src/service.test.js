@@ -505,6 +505,22 @@ test('login with incorrect password', async () => {
   expect(res.status).toBe(404);
 });
 
+test('login with empty password', async () => {
+  const res = await request(app)
+    .put('/api/auth')
+    .send({ email: testUser.email, password: '' });
+  expect(res.status).toBe(400);
+  expect(res.body.message).toBe('email and password are required');
+});
+
+test('login with empty email', async () => {
+  const res = await request(app)
+    .put('/api/auth')
+    .send({ email: '', password: 'somepassword' });
+  expect(res.status).toBe(400);
+  expect(res.body.message).toBe('email and password are required');
+});
+
 test('updateUser as different user - forbidden', async () => {
   const res = await request(app)
     .put(`/api/user/999`)

@@ -112,8 +112,20 @@ authRouter.post(
 authRouter.put(
   '/',
   asyncHandler(async (req, res) => {
+    const { email, password } = req.body;
+    if (
+      typeof email !== 'string' ||
+      email.trim() === '' ||
+      typeof password !== 'string' ||
+      password.length === 0
+    ) {
+      incrementAuthLoginFailure();
+      return res
+        .status(400)
+        .json({ message: 'email and password are required' });
+    }
+
     try {
-      const { email, password } = req.body;
       const user = await DB.getUser(email, password);
       const auth = await setAuth(user);
 

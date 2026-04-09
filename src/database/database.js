@@ -88,7 +88,9 @@ class DB {
       const user = userResult[0];
       if (
         !user ||
-        (password && !(await bcrypt.compare(password, user.password)))
+        (password !== undefined &&
+          password !== null &&
+          !(await bcrypt.compare(password, user.password)))
       ) {
         throw new StatusCodeError('unknown user', 404);
       }
