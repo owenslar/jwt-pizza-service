@@ -113,22 +113,47 @@ class DB {
   async updateUser(userId, name, email, password) {
     const connection = await this.getConnection();
     try {
-      const params = [];
+      const setClauses = [];
+      const queryParams = [];
       if (password) {
         const hashedPassword = await bcrypt.hash(password, 10);
-        params.push(`password='${hashedPassword}'`);
+        setClauses.push('password=?');
+        queryParams.push(hashedPassword);
       }
       if (email) {
-        params.push(`email='${email}'`);
+        setClauses.push('email=?');
+        queryParams.push(email);
       }
       if (name) {
-        params.push(`name='${name}'`);
+        setClauses.push('name=?');
+        queryParams.push(name);
       }
-      if (params.length > 0) {
-        const query = `UPDATE user SET ${params.join(', ')} WHERE id=${userId}`;
-        await this.query(connection, query);
+      if (setClauses.length > 0) {
+        queryParams.push(userId);
+        const query = `UPDATE user SET ${setClauses.join(', ')} WHERE id=?`;
+        await this.query(connection, query, queryParams);
       }
-      return this.getUser(email, password);
+
+      const userResult = await this.query(
+        connection,
+        `SELECT * FROM user WHERE id=?`,
+        [userId],
+      );
+      const updatedUser = userResult[0];
+      if (!updatedUser) {
+        throw new StatusCodeError('unknown user', 404);
+      }
+
+      const roleResult = await this.query(
+        connection,
+        `SELECT * FROM userRole WHERE userId=?`,
+        [updatedUser.id],
+      );
+      const roles = roleResult.map((r) => {
+        return { objectId: r.objectId || undefined, role: r.role };
+      });
+
+      return { ...updatedUser, roles, password: undefined };
     } finally {
       connection.end();
     }
@@ -153,18 +178,19 @@ class DB {
 
   async getUsers(page = 0, limit = 10, nameFilter = '*') {
     const connection = await this.getConnection();
-    const offset = page * limit;
-    nameFilter = nameFilter.replace(/\*/g, '%');
+    // eslint-disable-next-line no-unused-vars
+    const { pageNum, limitNum, offset } = this.normalizePagination(page, limit);
+    nameFilter = String(nameFilter ?? '*').replace(/\*/g, '%');
 
     try {
       let users = await this.query(
         connection,
-        `SELECT * from user WHERE name LIKE ? LIMIT ${limit + 1} OFFSET ${offset}`,
+        `SELECT * from user WHERE name LIKE ? LIMIT ${limitNum + 1} OFFSET ${offset}`,
         [nameFilter],
       );
-      const more = users.length > limit;
+      const more = users.length > limitNum;
       if (more) {
-        users = users.slice(0, limit);
+        users = users.slice(0, limitNum);
       }
 
       for (const user of users) {
@@ -228,10 +254,12 @@ class DB {
   async getOrders(user, page = 1) {
     const connection = await this.getConnection();
     try {
-      const offset = this.getOffset(page, config.db.listPerPage);
+      const pageNum = this.toBoundedInt(page, 1, 1);
+      const listPerPage = this.toBoundedInt(config.db.listPerPage, 10, 1);
+      const offset = this.getOffset(pageNum, listPerPage);
       const orders = await this.query(
         connection,
-        `SELECT id, franchiseId, storeId, date FROM dinerOrder WHERE dinerId=? LIMIT ${offset},${config.db.listPerPage}`,
+        `SELECT id, franchiseId, storeId, date FROM dinerOrder WHERE dinerId=? LIMIT ${offset}, ${listPerPage}`,
         [user.id],
       );
       for (const order of orders) {
@@ -242,7 +270,7 @@ class DB {
         );
         order.items = items;
       }
-      return { dinerId: user.id, orders: orders, page };
+      return { dinerId: user.id, orders: orders, page: pageNum };
     } finally {
       connection.end();
     }
@@ -338,19 +366,19 @@ class DB {
   async getFranchises(authUser, page = 0, limit = 10, nameFilter = '*') {
     const connection = await this.getConnection();
 
-    const offset = page * limit;
-    nameFilter = nameFilter.replace(/\*/g, '%');
+    const { limitNum, offset } = this.normalizePagination(page, limit);
+    nameFilter = String(nameFilter ?? '*').replace(/\*/g, '%');
 
     try {
       let franchises = await this.query(
         connection,
-        `SELECT id, name FROM franchise WHERE name LIKE ? LIMIT ${limit + 1} OFFSET ${offset}`,
+        `SELECT id, name FROM franchise WHERE name LIKE ? LIMIT ${limitNum + 1} OFFSET ${offset}`,
         [nameFilter],
       );
 
-      const more = franchises.length > limit;
+      const more = franchises.length > limitNum;
       if (more) {
-        franchises = franchises.slice(0, limit);
+        franchises = franchises.slice(0, limitNum);
       }
 
       for (const franchise of franchises) {
@@ -383,9 +411,11 @@ class DB {
       }
 
       franchiseIds = franchiseIds.map((v) => v.objectId);
+      const placeholders = franchiseIds.map(() => '?').join(',');
       const franchises = await this.query(
         connection,
-        `SELECT id, name FROM franchise WHERE id in (${franchiseIds.join(',')})`,
+        `SELECT id, name FROM franchise WHERE id in (${placeholders})`,
+        franchiseIds,
       );
       for (const franchise of franchises) {
         await this.getFranchise(franchise);
@@ -445,7 +475,21 @@ class DB {
   }
 
   getOffset(currentPage = 1, listPerPage) {
-    return (currentPage - 1) * [listPerPage];
+    return (currentPage - 1) * listPerPage;
+  }
+
+  normalizePagination(page, limit) {
+    const pageNum = this.toBoundedInt(page, 0, 0);
+    const limitNum = this.toBoundedInt(limit, 10, 1, 100);
+    return { pageNum, limitNum, offset: pageNum * limitNum };
+  }
+
+  toBoundedInt(value, defaultValue, min, max = Number.MAX_SAFE_INTEGER) {
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isFinite(parsed)) {
+      return defaultValue;
+    }
+    return Math.min(max, Math.max(min, parsed));
   }
 
   getTokenSignature(token) {
@@ -463,12 +507,24 @@ class DB {
   }
 
   async getID(connection, key, value, table) {
+    const allowedKeysByTable = {
+      menu: ['id'],
+      franchise: ['name'],
+      user: ['id', 'email'],
+    };
+    const allowedKeys = allowedKeysByTable[table];
+    if (!allowedKeys || !allowedKeys.includes(key)) {
+      throw new Error('Invalid identifier lookup');
+    }
+
+    const safeTable = this.getSafeIdentifier(table);
+    const safeKey = this.getSafeIdentifier(key);
     const [rows] = await connection.execute(
-      `SELECT id FROM ${table} WHERE ${key}=?`,
+      `SELECT id FROM ${safeTable} WHERE ${safeKey}=?`,
       [value],
     );
     logger.dbLogger({
-      query: `SELECT id FROM ${table} WHERE ${key}=?`,
+      query: `SELECT id FROM ${safeTable} WHERE ${safeKey}=?`,
       params: [value],
     });
     if (rows.length > 0) {
@@ -492,7 +548,10 @@ class DB {
       decimalNumbers: true,
     });
     if (setUse) {
-      await connection.query(`USE ${config.db.connection.database}`);
+      const safeDatabaseName = this.getSafeIdentifier(
+        config.db.connection.database,
+      );
+      await connection.query(`USE ${safeDatabaseName}`);
     }
     return connection;
   }
@@ -507,9 +566,11 @@ class DB {
         );
 
         await connection.query(
-          `CREATE DATABASE IF NOT EXISTS ${config.db.connection.database}`,
+          `CREATE DATABASE IF NOT EXISTS ${this.getSafeIdentifier(config.db.connection.database)}`,
         );
-        await connection.query(`USE ${config.db.connection.database}`);
+        await connection.query(
+          `USE ${this.getSafeIdentifier(config.db.connection.database)}`,
+        );
 
         if (!dbExists) {
           console.log('Successfully created database');
@@ -548,6 +609,13 @@ class DB {
       [config.db.connection.database],
     );
     return rows.length > 0;
+  }
+
+  getSafeIdentifier(identifier) {
+    if (typeof identifier !== 'string' || !/^[a-zA-Z0-9_]+$/.test(identifier)) {
+      throw new Error('Invalid SQL identifier');
+    }
+    return `\`${identifier}\``;
   }
 }
 

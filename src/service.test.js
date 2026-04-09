@@ -163,6 +163,31 @@ test('updateUser', async () => {
   expect(res.body.user.password).toBeUndefined();
 });
 
+test('updateUser SQL injection payload does not modify other users', async () => {
+  const [victimUser, victimToken] = await registerUser(request(app));
+  usersToCleanup.push(victimUser.id);
+
+  const attackerRes = await request(app)
+    .get('/api/user/me')
+    .set('Authorization', `Bearer ${testUserAuthToken}`);
+  const attackerId = attackerRes.body.id;
+  const attackerEmail = attackerRes.body.email;
+
+  const injectedName = `attacker', email='compromised@test.com' WHERE id=${victimUser.id} -- `;
+  const updateRes = await request(app)
+    .put(`/api/user/${attackerId}`)
+    .set('Authorization', `Bearer ${testUserAuthToken}`)
+    .send({ name: injectedName, email: attackerEmail });
+
+  expect(updateRes.status).toBe(200);
+
+  const victimRes = await request(app)
+    .get('/api/user/me')
+    .set('Authorization', `Bearer ${victimToken}`);
+  expect(victimRes.status).toBe(200);
+  expect(victimRes.body.email).toBe(victimUser.email);
+});
+
 test('delete users unauthorized', async () => {
   const res = await request(app).delete('/api/user/1');
   expect(res.status).toBe(401);
@@ -233,6 +258,14 @@ test('list users with bad params', async () => {
     .set('Authorization', 'Bearer ' + testUserAuthToken);
   expect(listUsersRes.body.users).toEqual([]);
   expect(listUsersRes.body.more).toBe(false);
+});
+
+test('list users with SQLi-style limit param', async () => {
+  const listUsersRes = await request(app)
+    .get('/api/user?page=0&limit=10%20OR%201=1')
+    .set('Authorization', 'Bearer ' + testUserAuthToken);
+  expect(listUsersRes.status).toBe(200);
+  expect(listUsersRes.body.users).toBeInstanceOf(Array);
 });
 
 test('list users with name filter', async () => {
@@ -357,6 +390,14 @@ test('getFranchises', async () => {
   expect(res.body).toBeInstanceOf(Object);
   expect(res.body.franchises).toBeInstanceOf(Array);
   expect(res.body.franchises.length).toBeDefined();
+});
+
+test('getFranchises with SQLi-style limit param', async () => {
+  const res = await request(app)
+    .get('/api/franchise?page=0&limit=10%20UNION%20SELECT')
+    .set('Authorization', `Bearer ${testUserAuthToken}`);
+  expect(res.status).toBe(200);
+  expect(res.body.franchises).toBeInstanceOf(Array);
 });
 
 test('getUserFranchises', async () => {
